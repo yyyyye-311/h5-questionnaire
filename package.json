@@ -1,0 +1,16 @@
+{
+  "name": "h5-questionnaire",
+  "version": "1.0.0",
+  "description": "H5 Questionnaire System",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.10.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
