@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>痕迹问卷 Trace Survey</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --black: #111;
+  --white: #fff;
+  --gray-light: #f5f5f5;
+  --gray-mid: #ccc;
+  --gray-dark: #666;
+  --transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  background: var(--white);
+  color: var(--black);
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Progress Bar */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--gray-light);
+  z-index: 1000;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--black);
+  transition: width var(--transition);
+  width: 0%;
+}
+
+/* Container */
+.container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Screens */
+.screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 32px 100px;
+  opacity: 0;
+  transform: translateX(60px);
+  transition: opacity var(--transition), transform var(--transition);
+  pointer-events: none;
+  overflow-y: auto;
+}
+
+.screen.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+.screen.exit-left {
+  opacity: 0;
+  transform: translateX(-60px);
+}
+
+/* Section Label */
+.section-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-dark);
+  margin-bottom: 16px;
+}
+
+/* Question */
+.question-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.question-subtitle {
+  font-size: 14px;
+  color: var(--gray-dark);
+  margin-bottom: 36px;
+  line-height: 1.4;
+}
+
+/* Options */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.option-card {
+  padding: 16px 20px;
+  border: 1.5px solid var(--gray-mid);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.option-card:active {
+  transform: scale(0.97);
+}
+
+.option-card.selected {
+  border-color: var(--black);
+  background: var(--black);
+  color: var(--white);
+}
+
+.option-label {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.option-sublabel {
+  font-size: 12px;
+  color: var(--gray-dark);
+  margin-top: 2px;
+}
+
+.option-card.selected .option-sublabel {
+  color: rgba(255,255,255,0.6);
+}
+
+/* Text Inputs */
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-label {
+  font-size: 13px;
+  color: var(--gray-dark);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.text-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--gray-mid);
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--white);
+  color: var(--black);
+}
+
+.text-input:focus {
+  border-color: var(--black);
+}
+
+textarea.text-input {
+  min-height: 140px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+/* Canvas */
+.canvas-wrapper {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.canvas-container {
+  flex: 1;
+  border: 1.5px solid var(--gray-mid);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  min-height: 200px;
+  touch-action: none;
+}
+
+.canvas-container canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.canvas-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  flex-wrap: wrap;
+}
+
+.color-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.color-swatch:active {
+  transform: scale(0.9);
+}
+
+.color-swatch.active {
+  border-color: var(--black);
+  transform: scale(1.15);
+}
+
+.brush-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.brush-size input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--gray-mid);
+  border-radius: 2px;
+  outline: none;
+}
+
+.brush-size input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--black);
+  cursor: pointer;
+}
+
+.canvas-btn {
+  padding: 8px 14px;
+  border: 1.5px solid var(--gray-mid);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  color: var(--black);
+}
+
+.canvas-btn:active {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* Navigation */
+.nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 16px 32px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 100;
+}
+
+.nav-btn {
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  border: none;
+}
+
+.nav-btn.prev {
+  background: transparent;
+  color: var(--gray-dark);
+}
+
+.nav-btn.prev:hover {
+  color: var(--black);
+}
+
+.nav-btn.next,
+.nav-btn.submit {
+  background: var(--black);
+  color: var(--white);
+}
+
+.nav-btn.next:active,
+.nav-btn.submit:active {
+  transform: scale(0.95);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.nav-counter {
+  font-size: 12px;
+  color: var(--gray-dark);
+}
+
+/* Submit overlay */
+.submit-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.submit-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.submit-overlay .checkmark {
+  width: 60px;
+  height: 60px;
+  border: 2px solid var(--black);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.submit-overlay .message {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.submit-overlay .sub-message {
+  font-size: 14px;
+  color: var(--gray-dark);
+}
+
+/* Responsive */
+@media (min-width: 600px) {
+  .screen {
+    max-width: 520px;
+    margin: 0 auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .screen.active {
+    transform: translateX(-50%);
+  }
+  .screen.exit-left {
+    transform: translateX(calc(-50% - 60px));
+  }
+  .nav-bar {
+    max-width: 520px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar">
+  <div class="progress-fill" id="progressFill"></div>
+</div>
+
+<div class="container" id="app"></div>
+
+<div class="nav-bar">
+  <button class="nav-btn prev" id="btnPrev" onclick="prevScreen()">返回</button>
+  <span class="nav-counter" id="navCounter">1 / 16</span>
+  <button class="nav-btn next" id="btnNext" onclick="nextScreen()">下一题</button>
+</div>
+
+<div class="submit-overlay" id="submitOverlay">
+  <div class="checkmark">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  </div>
+  <div class="message">提交成功</div>
+  <div class="sub-message">Thank you for your response</div>
+</div>
+
+<script>
+// Questions data
+const questions = [
+  {
+    id: 1, section: '基础信息 BASIC INFORMATION', type: 'choice',
+    title: '你的性别是',
+    subtitle: 'What is your gender?',
+    options: [
+      { value: 'A', zh: '男', en: 'Male' },
+      { value: 'B', zh: '女', en: 'Female' },
+      { value: 'C', zh: '非二元/其他', en: 'Non-binary/Other' },
+      { value: 'D', zh: '不愿透露', en: 'Prefer not to say' }
+    ]
+  },
+  {
+    id: 2, section: '基础信息 BASIC INFORMATION', type: 'choice',
+    title: '你的年龄段是',
+    subtitle: 'What is your age group?',
+    options: [
+      { value: 'A', zh: '18–22岁', en: '18–22' },
+      { value: 'B', zh: '23–26岁', en: '23–26' },
+      { value: 'C', zh: '27–30岁', en: '27–30' },
+      { value: 'D', zh: '30岁以上', en: '30+' }
+    ]
+  },
+  {
+    id: 3, section: '基础信息 BASIC INFORMATION', type: 'choice',
+    title: '你目前所在的城市类型',
+    subtitle: 'What type of city do you currently live in?',
+    options: [
+      { value: 'A', zh: '一线/新一线城市', en: 'Tier 1/New Tier 1' },
+      { value: 'B', zh: '二三线城市', en: 'Tier 2/Tier 3' },
+      { value: 'C', zh: '县城/乡镇', en: 'County/Rural' },
+      { value: 'D', zh: '流动状态（无固定城市）', en: 'Highly mobile/No fixed city' }
+    ]
+  },
+  {
+    id: 4, section: '痕迹类型 TRACE PATTERNS', type: 'choice',
+    title: '你手机中数量最多的内容类型是',
+    subtitle: 'What type of content dominates your phone gallery?',
+    options: [
+      { value: 'A', zh: '屏幕截图', en: 'Screenshots' },
+      { value: 'B', zh: '日常碎片', en: 'Daily fragments' },
+      { value: 'C', zh: '精致照片', en: 'Curated photos' },
+      { value: 'D', zh: '文档/笔记', en: 'Documents/notes' }
+    ]
+  },
+  {
+    id: 5, section: '痕迹类型 TRACE PATTERNS', type: 'choice',
+    title: '你的居住空间更接近',
+    subtitle: 'Your living space is closer to:',
+    options: [
+      { value: 'A', zh: '堆积状态', en: 'Cluttered' },
+      { value: 'B', zh: '有生活痕迹但可控', en: 'Lived-in but controlled' },
+      { value: 'C', zh: '精心布置', en: 'Carefully designed' },
+      { value: 'D', zh: '几乎无痕迹', en: 'Nearly traceless' }
+    ]
+  },
+  {
+    id: 6, section: '痕迹类型 TRACE PATTERNS', type: 'choice',
+    title: '如果你突然消失，最能代表你的物件是',
+    subtitle: 'If you disappeared, what would represent you best?',
+    options: [
+      { value: 'A', zh: '数字数据', en: 'Digital data' },
+      { value: 'B', zh: '手写/手作', en: 'Handwritten/handmade' },
+      { value: 'C', zh: '未完成的事物', en: 'Unfinished items' },
+      { value: 'D', zh: '日常用品', en: 'Everyday objects' }
+    ]
+  },
+  {
+    id: 7, section: '连接关系 CONNECTION', type: 'choice',
+    title: '你与邻居的关系是',
+    subtitle: 'Your relationship with your neighbors:',
+    options: [
+      { value: 'A', zh: '完全不认识', en: 'Do not know them' },
+      { value: 'B', zh: '见过但不熟', en: 'Recognize but not familiar' },
+      { value: 'C', zh: '偶尔交流', en: 'Occasional interaction' },
+      { value: 'D', zh: '熟悉', en: 'Familiar' }
+    ]
+  },
+  {
+    id: 8, section: '连接关系 CONNECTION', type: 'choice',
+    title: '你最近一周线下见朋友的频率',
+    subtitle: 'How often did you meet people offline in the past week?',
+    options: [
+      { value: 'A', zh: '0次', en: 'None' },
+      { value: 'B', zh: '1次', en: 'Once' },
+      { value: 'C', zh: '2–3次', en: 'Two to three times' },
+      { value: 'D', zh: '4次及以上', en: 'Four or more times' }
+    ]
+  },
+  {
+    id: 9, section: '连接关系 CONNECTION', type: 'choice',
+    title: '当你需要倾诉时，你通常会',
+    subtitle: 'When you need to express yourself, you:',
+    options: [
+      { value: 'A', zh: '面向网络', en: 'Turn to online spaces' },
+      { value: 'B', zh: '找朋友', en: 'Talk to friends' },
+      { value: 'C', zh: '找家人', en: 'Talk to family' },
+      { value: 'D', zh: '不倾诉', en: 'Internalize' }
+    ]
+  },
+  {
+    id: 10, section: '视觉感知 VISUAL PERCEPTION', type: 'choice',
+    title: '如果"迷茫"是一种图形，它更像',
+    subtitle: 'If "confusion" were a shape, it would be:',
+    options: [
+      { value: 'A', zh: '缠绕的线', en: 'Tangled lines' },
+      { value: 'B', zh: '分散的箭头', en: 'Scattered arrows' },
+      { value: 'C', zh: '循环的圆', en: 'Looping circle' },
+      { value: 'D', zh: '空白', en: 'Blank space' }
+    ]
+  },
+  {
+    id: 11, section: '视觉感知 VISUAL PERCEPTION', type: 'choice',
+    title: '你当前的生活更接近哪种质感',
+    subtitle: 'Your current life feels like:',
+    options: [
+      { value: 'A', zh: '雾气', en: 'Mist/haze' },
+      { value: 'B', zh: '拼贴', en: 'Collage' },
+      { value: 'C', zh: '摩擦', en: 'Friction' },
+      { value: 'D', zh: '稳定', en: 'Structure' }
+    ]
+  },
+  {
+    id: 12, section: '状态与未来 STATE & PROJECTION', type: 'choice',
+    title: '你目前的状态更接近',
+    subtitle: 'Your current state is closest to:',
+    options: [
+      { value: 'A', zh: '漂浮', en: 'Floating' },
+      { value: 'B', zh: '游走', en: 'Wandering' },
+      { value: 'C', zh: '前进', en: 'Moving forward' },
+      { value: 'D', zh: '扎根', en: 'Anchored' }
+    ]
+  },
+  {
+    id: 13, section: '附加收束 OPTIONAL', type: 'choice',
+    title: '你觉得自己是否"有迹可循"',
+    subtitle: 'Do you feel your existence is traceable?',
+    options: [
+      { value: 'A', zh: '几乎没有', en: 'Barely traceable' },
+      { value: 'B', zh: '很微弱', en: 'Slightly traceable' },
+      { value: 'C', zh: '有一些', en: 'Somewhat traceable' },
+      { value: 'D', zh: '非常清晰', en: 'Clearly traceable' }
+    ]
+  },
+  {
+    id: 14, section: '开放问题 OPEN-ENDED', type: 'dual-input',
+    title: '请分享一件最能代表你当前状态的具体物品，并用一个词形容它',
+    subtitle: 'Share an object that represents your current state, and describe it in one word.',
+    fields: [
+      { key: 'object', label: '物品 Object', placeholder: '例如：一只旧杯子' },
+      { key: 'adjective', label: '形容词 Adjective', placeholder: '例如：沉默' }
+    ]
+  },
+  {
+    id: 15, section: '开放问题 OPEN-ENDED', type: 'textarea',
+    title: '请描述一个你"感到真实存在"的瞬间',
+    subtitle: 'Describe a moment when you felt truly present.',
+    placeholder: '可以是任何时刻...'
+  },
+  {
+    id: 16, section: '开放问题 OPEN-ENDED', type: 'canvas',
+    title: '请画出你今天的路径图',
+    subtitle: 'Draw your path today.'
+  }
+];
+
+// State
+let current = 0;
+const answers = {};
+let canvasHistory = [];
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let brushColor = '#111111';
+let brushSize = 4;
+let ctx = null;
+let canvas = null;
+
+// Render screens
+function renderApp() {
+  const app = document.getElementById('app');
+  app.innerHTML = questions.map((q, i) => {
+    let content = '';
+
+    if (q.type === 'choice') {
+      content = `<div class="options">${q.options.map(opt => `
+        <div class="option-card" data-q="${q.id}" data-val="${opt.value}" onclick="selectOption(${q.id}, '${opt.value}', this)">
+          <div class="option-label">${opt.zh}</div>
+          <div class="option-sublabel">${opt.en}</div>
+        </div>
+      `).join('')}</div>`;
+    } else if (q.type === 'dual-input') {
+      content = q.fields.map(f => `
+        <div class="input-group">
+          <label class="input-label">${f.label}</label>
+          <input type="text" class="text-input" placeholder="${f.placeholder}" data-q="${q.id}" data-field="${f.key}" oninput="handleTextInput(${q.id}, '${f.key}', this.value)">
+        </div>
+      `).join('');
+    } else if (q.type === 'textarea') {
+      content = `
+        <div class="input-group">
+          <textarea class="text-input" placeholder="${q.placeholder}" data-q="${q.id}" oninput="handleTextarea(${q.id}, this.value)"></textarea>
+        </div>
+      `;
+    } else if (q.type === 'canvas') {
+      content = `
+        <div class="canvas-wrapper">
+          <div class="canvas-controls">
+            <div class="color-picker">
+              <div class="color-swatch active" style="background:#111" data-color="#111111" onclick="setColor(this, '#111111')"></div>
+              <div class="color-swatch" style="background:#666" data-color="#666666" onclick="setColor(this, '#666666')"></div>
+              <div class="color-swatch" style="background:#999" data-color="#999999" onclick="setColor(this, '#999999')"></div>
+              <div class="color-swatch" style="background:#ccc" data-color="#cccccc" onclick="setColor(this, '#cccccc')"></div>
+              <div class="color-swatch" style="background:#e74c3c" data-color="#e74c3c" onclick="setColor(this, '#e74c3c')"></div>
+            </div>
+            <div class="brush-size">
+              <input type="range" min="1" max="20" value="4" oninput="setBrushSize(this.value)">
+            </div>
+            <button class="canvas-btn" onclick="undoCanvas()">撤销</button>
+            <button class="canvas-btn" onclick="clearCanvas()">清除</button>
+          </div>
+          <div class="canvas-container">
+            <canvas id="drawCanvas"></canvas>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="screen${i === 0 ? ' active' : ''}" id="screen-${i}">
+        <div class="section-label">${q.section}</div>
+        <div class="question-title">${q.title}</div>
+        <div class="question-subtitle">${q.subtitle}</div>
+        ${content}
+      </div>
+    `;
+  }).join('');
+
+  updateNav();
+}
+
+// Option selection
+function selectOption(qId, value, el) {
+  answers[qId] = value;
+  const cards = el.parentElement.querySelectorAll('.option-card');
+  cards.forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+
+  // Auto-advance after brief delay
+  setTimeout(() => nextScreen(), 300);
+}
+
+// Text inputs
+function handleTextInput(qId, field, value) {
+  if (!answers[qId]) answers[qId] = {};
+  answers[qId][field] = value;
+}
+
+function handleTextarea(qId, value) {
+  answers[qId] = value;
+}
+
+// Canvas
+function setColor(el, color) {
+  brushColor = color;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setBrushSize(val) {
+  brushSize = parseInt(val);
+}
+
+function initCanvas() {
+  canvas = document.getElementById('drawCanvas');
+  if (!canvas) return;
+
+  const container = canvas.parentElement;
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+
+  ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  saveCanvasState();
+
+  // Mouse events
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+
+  // Touch events
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+  canvas.addEventListener('touchend', endDraw);
+  canvas.addEventListener('touchcancel', endDraw);
+}
+
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+function startDraw(e) {
+  isDrawing = true;
+  const pos = getCanvasPos(e);
+  lastX = pos.x;
+  lastY = pos.y;
+  ctx.beginPath();
+  ctx.moveTo(pos.x, pos.y);
+}
+
+function draw(e) {
+  if (!isDrawing) return;
+  const pos = getCanvasPos(e);
+  ctx.strokeStyle = brushColor;
+  ctx.lineWidth = brushSize;
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.stroke();
+  lastX = pos.x;
+  lastY = pos.y;
+}
+
+function endDraw() {
+  if (isDrawing) {
+    isDrawing = false;
+    saveCanvasState();
+  }
+}
+
+function handleTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  startDraw(mouseEvent);
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  draw(mouseEvent);
+}
+
+function saveCanvasState() {
+  canvasHistory.push(canvas.toDataURL());
+  if (canvasHistory.length > 30) canvasHistory.shift();
+}
+
+function undoCanvas() {
+  if (canvasHistory.length > 1) {
+    canvasHistory.pop();
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width / 2, canvas.height / 2);
+      ctx.drawImage(img, 0, 0, canvas.width / 2, canvas.height / 2);
+    };
+    img.src = canvasHistory[canvasHistory.length - 1];
+  }
+}
+
+function clearCanvas() {
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width / 2, canvas.height / 2);
+  saveCanvasState();
+}
+
+// Navigation
+function nextScreen() {
+  if (current >= questions.length - 1) {
+    submitForm();
+    return;
+  }
+
+  const currentScreen = document.getElementById(`screen-${current}`);
+  currentScreen.classList.remove('active');
+  currentScreen.classList.add('exit-left');
+
+  current++;
+
+  const nextScreenEl = document.getElementById(`screen-${current}`);
+  nextScreenEl.classList.remove('exit-left');
+  nextScreenEl.classList.add('active');
+
+  updateNav();
+
+  // Init canvas when reaching that screen
+  if (questions[current].type === 'canvas') {
+    setTimeout(initCanvas, 500);
+  }
+}
+
+function prevScreen() {
+  if (current <= 0) return;
+
+  const currentScreen = document.getElementById(`screen-${current}`);
+  currentScreen.classList.remove('active');
+
+  current--;
+
+  const prevScreenEl = document.getElementById(`screen-${current}`);
+  prevScreenEl.classList.remove('exit-left');
+  prevScreenEl.classList.add('active');
+
+  updateNav();
+}
+
+function updateNav() {
+  const progress = ((current + 1) / questions.length) * 100;
+  document.getElementById('progressFill').style.width = progress + '%';
+  document.getElementById('navCounter').textContent = `${current + 1} / ${questions.length}`;
+
+  const btnPrev = document.getElementById('btnPrev');
+  const btnNext = document.getElementById('btnNext');
+
+  btnPrev.style.visibility = current === 0 ? 'hidden' : 'visible';
+
+  if (current === questions.length - 1) {
+    btnNext.textContent = '提交';
+    btnNext.classList.add('submit');
+    btnNext.classList.remove('next');
+  } else {
+    btnNext.textContent = '下一题';
+    btnNext.classList.remove('submit');
+    btnNext.classList.add('next');
+  }
+}
+
+// Submit
+async function submitForm() {
+  // Get canvas data
+  let canvasData = null;
+  if (canvas) {
+    canvasData = canvas.toDataURL('image/png');
+  }
+
+  const payload = {
+    answers: {},
+    canvas: canvasData,
+    submittedAt: new Date().toISOString()
+  };
+
+  // Format answers
+  questions.forEach(q => {
+    if (q.type === 'choice') {
+      payload.answers[`q${q.id}`] = answers[q.id] || null;
+    } else if (q.type === 'dual-input') {
+      payload.answers[`q${q.id}`] = answers[q.id] || { object: '', adjective: '' };
+    } else if (q.type === 'textarea') {
+      payload.answers[`q${q.id}`] = answers[q.id] || '';
+    }
+  });
+
+  try {
+    await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.log('Submit endpoint not available, payload logged:', payload);
+  }
+
+  // Show success
+  document.getElementById('submitOverlay').classList.add('visible');
+}
+
+// Init
+renderApp();
+</script>
+</body>
+</html>
