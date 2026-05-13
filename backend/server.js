@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
-const initSqlJs = require('sql.js');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,24 +14,18 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Database setup
-const dbPath = path.join(__dirname, 'questionnaire.db');
-let db;
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_ynx6hDeXZO7R@ep-square-bonus-aqzgfhlj-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 async function initDatabase() {
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(dbPath)) {
-    const fileBuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  // Create tables
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      id SERIAL PRIMARY KEY,
+      submitted_at TIMESTAMP DEFAULT NOW(),
       q1 TEXT,
       q2 TEXT,
       q3 TEXT,
@@ -55,10 +48,10 @@ async function initDatabase() {
     )
   `);
 
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS sensory_responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      id SERIAL PRIMARY KEY,
+      submitted_at TIMESTAMP DEFAULT NOW(),
       q1 TEXT,
       q2 TEXT,
       q3 TEXT,
@@ -75,37 +68,6 @@ async function initDatabase() {
       user_agent TEXT
     )
   `);
-
-  saveDatabase();
-}
-
-function saveDatabase() {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(dbPath, buffer);
-}
-
-// Helper: convert sql.js result to array of objects
-function queryAll(sql, params) {
-  const stmt = db.prepare(sql);
-  if (params) stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-function queryOne(sql, params) {
-  const stmt = db.prepare(sql);
-  if (params) stmt.bind(params);
-  let row = null;
-  if (stmt.step()) {
-    row = stmt.getAsObject();
-  }
-  stmt.free();
-  return row;
 }
 
 // ============================================================
@@ -203,19 +165,20 @@ function classifySensoryMovement(row) {
 // ============================================================
 
 // POST /api/submit — submit a questionnaire response
-app.post('/api/submit', (req, res) => {
+app.post('/api/submit', async (req, res) => {
   try {
     const data = req.body;
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
 
-    db.run(`
+    const result = await pool.query(`
       INSERT INTO responses (
         q1, q2, q3, q4, q5, q6, q7, q8, q9, q10,
         q11, q12, q13, q14_object, q14_adjective,
         q15_moment, q16_drawing, ip_address, user_agent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      RETURNING id
     `, [
       data.q1 || null,
       data.q2 || null,
@@ -238,8 +201,7 @@ app.post('/api/submit', (req, res) => {
       ua
     ]);
 
-    const lastId = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDatabase();
+    const lastId = result.rows[0].id;
 
     res.json({ success: true, id: lastId });
   } catch (err) {
@@ -249,10 +211,10 @@ app.post('/api/submit', (req, res) => {
 });
 
 // GET /api/responses — all responses (admin)
-app.get('/api/responses', (req, res) => {
+app.get('/api/responses', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM responses ORDER BY submitted_at DESC');
-    res.json({ success: true, count: rows.length, data: rows });
+    const result = await pool.query('SELECT * FROM responses ORDER BY submitted_at DESC');
+    res.json({ success: true, count: result.rows.length, data: result.rows });
   } catch (err) {
     console.error('Fetch responses error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -260,12 +222,13 @@ app.get('/api/responses', (req, res) => {
 });
 
 // GET /api/responses/:id — single response detail
-app.get('/api/responses/:id', (req, res) => {
+app.get('/api/responses/:id', async (req, res) => {
   try {
-    const row = queryOne('SELECT * FROM responses WHERE id = ?', [parseInt(req.params.id)]);
-    if (!row) {
+    const result = await pool.query('SELECT * FROM responses WHERE id = $1', [parseInt(req.params.id)]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Response not found' });
     }
+    const row = result.rows[0];
     // Add analysis dimensions
     row.emotional_type = classifyEmotion(row);
     row.behavioral_type = classifyBehavior(row);
@@ -277,9 +240,10 @@ app.get('/api/responses/:id', (req, res) => {
 });
 
 // GET /api/stats — aggregated statistics
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM responses');
+    const result = await pool.query('SELECT * FROM responses');
+    const rows = result.rows;
     const totalCount = rows.length;
 
     // Option counts for q1-q13
@@ -360,9 +324,10 @@ app.get('/api/stats', (req, res) => {
 });
 
 // GET /api/export — CSV export
-app.get('/api/export', (req, res) => {
+app.get('/api/export', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM responses ORDER BY submitted_at DESC');
+    const result = await pool.query('SELECT * FROM responses ORDER BY submitted_at DESC');
+    const rows = result.rows;
 
     const headers = [
       'id', 'submitted_at',
@@ -408,19 +373,20 @@ app.get('/api/export', (req, res) => {
 // ============================================================
 
 // POST /api/sensory/submit — submit a sensory mapping response
-app.post('/api/sensory/submit', (req, res) => {
+app.post('/api/sensory/submit', async (req, res) => {
   try {
     const data = req.body;
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
 
-    db.run(`
+    const result = await pool.query(`
       INSERT INTO sensory_responses (
         q1, q2, q3, q4, q5, scent, weather, bpm,
         generated_poem, generated_extra, tempo_word, music_type,
         ip_address, user_agent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id
     `, [
       data.q1 || null,
       data.q2 || null,
@@ -438,8 +404,7 @@ app.post('/api/sensory/submit', (req, res) => {
       ua
     ]);
 
-    const lastId = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
-    saveDatabase();
+    const lastId = result.rows[0].id;
 
     res.json({ success: true, id: lastId });
   } catch (err) {
@@ -449,10 +414,10 @@ app.post('/api/sensory/submit', (req, res) => {
 });
 
 // GET /api/sensory/responses — all sensory responses
-app.get('/api/sensory/responses', (req, res) => {
+app.get('/api/sensory/responses', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
-    res.json({ success: true, count: rows.length, data: rows });
+    const result = await pool.query('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
+    res.json({ success: true, count: result.rows.length, data: result.rows });
   } catch (err) {
     console.error('Fetch sensory responses error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -460,9 +425,10 @@ app.get('/api/sensory/responses', (req, res) => {
 });
 
 // GET /api/sensory/stats — sensory mapping statistics
-app.get('/api/sensory/stats', (req, res) => {
+app.get('/api/sensory/stats', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM sensory_responses');
+    const result = await pool.query('SELECT * FROM sensory_responses');
+    const rows = result.rows;
     const totalCount = rows.length;
 
     // Option counts for q1-q5
@@ -575,9 +541,10 @@ app.get('/api/sensory/stats', (req, res) => {
 });
 
 // GET /api/sensory/export — CSV export of sensory responses
-app.get('/api/sensory/export', (req, res) => {
+app.get('/api/sensory/export', async (req, res) => {
   try {
-    const rows = queryAll('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
+    const result = await pool.query('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
+    const rows = result.rows;
 
     const headers = [
       'id', 'submitted_at',
@@ -632,7 +599,7 @@ async function start() {
   await initDatabase();
   app.listen(PORT, () => {
     console.log(`✅ 问卷系统后端已启动: http://localhost:${PORT}`);
-    console.log(`📁 数据库路径: ${dbPath}`);
+    console.log(`🐘 使用 PostgreSQL 数据库`);
     console.log(`📂 静态文件目录: ${path.join(__dirname, '..', 'frontend')}`);
   });
 }
