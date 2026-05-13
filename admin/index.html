@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>问卷后台 · 数据分析</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #fff;
+  --fg: #111;
+  --border: #e0e0e0;
+  --muted: #888;
+  --accent: #000;
+  --card-bg: #fafafa;
+  --radius: 6px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.6;
+  padding: 40px 60px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 48px 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--fg);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.toggle-label {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.toggle-label input { cursor: pointer; }
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+button:hover { opacity: 0.8; }
+
+button.outline {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+button.outline:hover { border-color: var(--fg); }
+
+/* Stats Cards */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.stat-card .label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.stat-card .value {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+/* Chart containers */
+.chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.chart-container canvas {
+  max-height: 300px;
+}
+
+/* Question breakdown */
+.section-group {
+  margin-bottom: 32px;
+}
+
+.section-group .section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.question-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.question-card .q-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.question-card canvas {
+  max-height: 160px;
+}
+
+/* Pie charts row */
+.pie-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.pie-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.pie-card canvas {
+  max-height: 260px;
+}
+
+.type-desc {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+/* Open-ended */
+.open-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.open-list {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.open-list .item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.open-list .item:last-child { border-bottom: none; }
+
+.open-list .item .idx {
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: 8px;
+}
+
+/* Drawing gallery */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.gallery-item {
+  aspect-ratio: 1;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.gallery-item:hover { transform: scale(1.02); }
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+/* Individual viewer */
+.viewer-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.viewer-controls select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  background: #fff;
+  min-width: 300px;
+}
+
+.response-detail {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.response-detail table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.response-detail th,
+.response-detail td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.response-detail th {
+  font-weight: 600;
+  width: 180px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.response-detail .drawing-preview {
+  max-width: 300px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>问卷数据分析</h1>
+    <p style="color: var(--muted); font-size: 13px;">H5 痕迹问卷 · 后台管理面板</p>
+  </div>
+  <div class="header-right">
+    <label class="toggle-label">
+      <input type="checkbox" id="autoRefresh"> 自动刷新 (30s)
+    </label>
+    <button class="outline" onclick="loadData()">刷新数据</button>
+    <button onclick="exportCSV()">导出 CSV</button>
+  </div>
+</div>
+
+<!-- Overview -->
+<section id="overview">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">总提交数</div>
+      <div class="value" id="totalCount">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">完成率</div>
+      <div class="value" id="completionRate">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">今日提交</div>
+      <div class="value" id="todayCount">—</div>
+    </div>
+  </div>
+  <div class="chart-container">
+    <h3>提交趋势（按日）</h3>
+    <canvas id="timelineChart"></canvas>
+  </div>
+</section>
+
+<!-- Question Breakdown -->
+<h2>问题分布 Question Breakdown</h2>
+<section id="questions">
+  <div class="section-group">
+    <div class="section-title">基础信息</div>
+    <div class="question-grid">
+      <div class="question-card"><div class="q-label">Q1 · 性别 Gender</div><canvas id="chartQ1"></canvas></div>
+      <div class="question-card"><div class="q-label">Q2 · 年龄段 Age Group</div><canvas id="chartQ2"></canvas></div>
+      <div class="question-card"><div class="q-label">Q3 · 城市类型 City Type</div><canvas id="chartQ3"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-group">
+    <div class="section-title">痕迹类型</div>
+    <div class="question-grid">
+      <div class="question-card"><div class="q-label">Q4 · 手机内容 Phone Content</div><canvas id="chartQ4"></canvas></div>
+      <div class="question-card"><div class="q-label">Q5 · 居住空间 Living Space</div><canvas id="chartQ5"></canvas></div>
+      <div class="question-card"><div class="q-label">Q6 · 代表物件 Representative Object</div><canvas id="chartQ6"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-group">
+    <div class="section-title">连接关系</div>
+    <div class="question-grid">
+      <div class="question-card"><div class="q-label">Q7 · 邻居关系 Neighbor Relationship</div><canvas id="chartQ7"></canvas></div>
+      <div class="question-card"><div class="q-label">Q8 · 线下社交 Offline Social</div><canvas id="chartQ8"></canvas></div>
+      <div class="question-card"><div class="q-label">Q9 · 倾诉方式 Expression Method</div><canvas id="chartQ9"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-group">
+    <div class="section-title">视觉感知</div>
+    <div class="question-grid">
+      <div class="question-card"><div class="q-label">Q10 · 迷茫图形 Confusion Shape</div><canvas id="chartQ10"></canvas></div>
+      <div class="question-card"><div class="q-label">Q11 · 生活质感 Life Texture</div><canvas id="chartQ11"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-group">
+    <div class="section-title">状态与未来</div>
+    <div class="question-grid">
+      <div class="question-card"><div class="q-label">Q12 · 当前状态 Current State</div><canvas id="chartQ12"></canvas></div>
+      <div class="question-card"><div class="q-label">Q13 · 有迹可循 Traceability</div><canvas id="chartQ13"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- Analysis -->
+<h2>综合分析 Analysis</h2>
+<div class="pie-row">
+  <div class="pie-card">
+    <h3>情绪分析 Emotional Types</h3>
+    <canvas id="emotionChart"></canvas>
+    <div class="type-desc">
+      <strong>漂泊型</strong> — 居无定所感，频繁变动<br>
+      <strong>挣扎型</strong> — 内心冲突明显，焦虑感较强<br>
+      <strong>沉稳型</strong> — 安定从容，自洽度高<br>
+      <strong>探索型</strong> — 好奇开放，拥抱不确定性<br>
+      <strong>未分类</strong> — 特征不明显
+    </div>
+  </div>
+  <div class="pie-card">
+    <h3>行为分析 Behavioral Types</h3>
+    <canvas id="behaviorChart"></canvas>
+    <div class="type-desc">
+      <strong>数字游牧</strong> — 线上生活为主，数字痕迹丰富<br>
+      <strong>社交活跃</strong> — 人际连接广泛，外向表达<br>
+      <strong>内向沉淀</strong> — 偏独处，深度思考型<br>
+      <strong>生活主义</strong> — 注重日常质感，仪式感强<br>
+      <strong>未分类</strong> — 特征不明显
+    </div>
+  </div>
+</div>
+
+<!-- Open-ended -->
+<h2>开放题回答 Open-ended Responses</h2>
+<div class="open-section">
+  <div class="open-list" id="q14List">
+    <h3>Q14 · 物品 + 形容词</h3>
+    <div class="loading">加载中...</div>
+  </div>
+  <div class="open-list" id="q15List">
+    <h3>Q15 · 某个瞬间 Moment</h3>
+    <div class="loading">加载中...</div>
+  </div>
+</div>
+<div>
+  <h3>Q16 · 画板绘图 Drawings</h3>
+  <div class="gallery" id="drawingGallery">
+    <div class="loading">加载中...</div>
+  </div>
+</div>
+
+<!-- Modal for drawings -->
+<div class="modal-overlay" id="imageModal" onclick="this.classList.remove('active')">
+  <img id="modalImg" src="" alt="drawing">
+</div>
+
+<!-- Individual Viewer -->
+<h2>个体查看 Individual Viewer</h2>
+<div class="viewer-controls">
+  <select id="responseSelect" onchange="showResponse(this.value)">
+    <option value="">选择一条提交记录...</option>
+  </select>
+</div>
+<div class="response-detail" id="responseDetail" style="display:none;"></div>
+
+<script>
+// ─── Config ───
+const API_BASE = '';
+const QUESTION_LABELS = {
+  q1: '性别 Gender',
+  q2: '年龄段 Age Group',
+  q3: '城市类型 City Type',
+  q4: '手机内容 Phone Content',
+  q5: '居住空间 Living Space',
+  q6: '代表物件 Representative Object',
+  q7: '邻居关系 Neighbor Relationship',
+  q8: '线下社交 Offline Social',
+  q9: '倾诉方式 Expression Method',
+  q10: '迷茫图形 Confusion Shape',
+  q11: '生活质感 Life Texture',
+  q12: '当前状态 Current State',
+  q13: '有迹可循 Traceability',
+  q14: '物品 + 形容词',
+  q15: '某个瞬间 Moment',
+  q16: '画板绘图 Drawing'
+};
+
+const CHART_COLORS = ['#111', '#555', '#999', '#ccc'];
+
+let statsData = null;
+let responsesData = null;
+let charts = {};
+let refreshInterval = null;
+
+// ─── Data Loading ───
+async function loadData() {
+  try {
+    const [statsRes, responsesRes] = await Promise.all([
+      fetch(`${API_BASE}/api/stats`),
+      fetch(`${API_BASE}/api/responses`)
+    ]);
+    statsData = await statsRes.json();
+    responsesData = await responsesRes.json();
+    render();
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+}
+
+function exportCSV() {
+  window.open(`${API_BASE}/api/export`, '_blank');
+}
+
+// ─── Rendering ───
+function render() {
+  renderOverview();
+  renderTimeline();
+  renderQuestions();
+  renderEmotionChart();
+  renderBehaviorChart();
+  renderOpenEnded();
+  renderResponseSelector();
+}
+
+function renderOverview() {
+  const s = statsData;
+  document.getElementById('totalCount').textContent = s.totalSubmissions || 0;
+  document.getElementById('completionRate').textContent =
+    s.completionRate != null ? (s.completionRate * 100).toFixed(1) + '%' : '—';
+  document.getElementById('todayCount').textContent = s.todayCount || 0;
+}
+
+function renderTimeline() {
+  const ctx = document.getElementById('timelineChart').getContext('2d');
+  const timeline = statsData.timeline || [];
+
+  if (charts.timeline) charts.timeline.destroy();
+
+  charts.timeline = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timeline.map(d => d.date),
+      datasets: [{
+        label: '提交数',
+        data: timeline.map(d => d.count),
+        borderColor: '#111',
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#111'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: '#f0f0f0' } }
+      }
+    }
+  });
+}
+
+function renderQuestions() {
+  const dist = statsData.questionDistribution || {};
+
+  for (let i = 1; i <= 13; i++) {
+    const key = `q${i}`;
+    const canvasId = `chartQ${i}`;
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const qData = dist[key] || {};
+
+    const labels = Object.keys(qData);
+    const values = Object.values(qData);
+    const total = values.reduce((a, b) => a + b, 0) || 1;
+
+    if (charts[key]) charts[key].destroy();
+
+    charts[key] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values.map(v => ((v / total) * 100).toFixed(1)),
+          backgroundColor: CHART_COLORS.slice(0, labels.length),
+          borderWidth: 0,
+          borderRadius: 3
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.raw}%`
+            }
+          }
+        },
+        scales: {
+          x: {
+            max: 100,
+            grid: { color: '#f0f0f0' },
+            ticks: { callback: v => v + '%' }
+          },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+function renderEmotionChart() {
+  const ctx = document.getElementById('emotionChart').getContext('2d');
+  const emotion = statsData.emotionTypes || {};
+  const labels = ['漂泊型', '挣扎型', '沉稳型', '探索型', '未分类'];
+  const data = labels.map(l => emotion[l] || 0);
+
+  if (charts.emotion) charts.emotion.destroy();
+
+  charts.emotion = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: ['#111', '#444', '#777', '#aaa', '#ddd'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 } } }
+      }
+    }
+  });
+}
+
+function renderBehaviorChart() {
+  const ctx = document.getElementById('behaviorChart').getContext('2d');
+  const behavior = statsData.behaviorTypes || {};
+  const labels = ['数字游牧', '社交活跃', '内向沉淀', '生活主义', '未分类'];
+  const data = labels.map(l => behavior[l] || 0);
+
+  if (charts.behavior) charts.behavior.destroy();
+
+  charts.behavior = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: ['#111', '#444', '#777', '#aaa', '#ddd'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 } } }
+      }
+    }
+  });
+}
+
+function renderOpenEnded() {
+  const responses = responsesData || [];
+
+  // Q14
+  const q14Container = document.getElementById('q14List');
+  const q14Items = responses
+    .filter(r => r.q14)
+    .map((r, i) => `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(r.q14)}</div>`)
+    .join('');
+  q14Container.innerHTML = `<h3>Q14 · 物品 + 形容词</h3>${q14Items || '<div class="item" style="color:var(--muted)">暂无数据</div>'}`;
+
+  // Q15
+  const q15Container = document.getElementById('q15List');
+  const q15Items = responses
+    .filter(r => r.q15)
+    .map((r, i) => `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(r.q15)}</div>`)
+    .join('');
+  q15Container.innerHTML = `<h3>Q15 · 某个瞬间 Moment</h3>${q15Items || '<div class="item" style="color:var(--muted)">暂无数据</div>'}`;
+
+  // Q16 drawings
+  const gallery = document.getElementById('drawingGallery');
+  const drawings = responses.filter(r => r.q16);
+  if (drawings.length === 0) {
+    gallery.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:20px;">暂无绘图数据</div>';
+    return;
+  }
+  gallery.innerHTML = drawings.map((r, i) => {
+    const src = r.q16.startsWith('data:') ? r.q16 : `${API_BASE}${r.q16}`;
+    return `<div class="gallery-item" onclick="openImage('${src.replace(/'/g, "\\'")}')"><img src="${src}" alt="drawing ${i + 1}" loading="lazy"></div>`;
+  }).join('');
+}
+
+function renderResponseSelector() {
+  const select = document.getElementById('responseSelect');
+  const responses = responsesData || [];
+
+  select.innerHTML = '<option value="">选择一条提交记录...</option>';
+  responses.forEach((r, i) => {
+    const label = `#${i + 1} — ${r.submittedAt || r.timestamp || '未知时间'}`;
+    select.innerHTML += `<option value="${i}">${label}</option>`;
+  });
+}
+
+function showResponse(index) {
+  const detail = document.getElementById('responseDetail');
+  if (index === '' || index == null) {
+    detail.style.display = 'none';
+    return;
+  }
+
+  const r = responsesData[index];
+  if (!r) return;
+
+  let rows = '';
+  for (let i = 1; i <= 13; i++) {
+    const key = `q${i}`;
+    rows += `<tr><th>Q${i} · ${QUESTION_LABELS[key]}</th><td>${escapeHtml(r[key] || '—')}</td></tr>`;
+  }
+  rows += `<tr><th>Q14 · ${QUESTION_LABELS.q14}</th><td>${escapeHtml(r.q14 || '—')}</td></tr>`;
+  rows += `<tr><th>Q15 · ${QUESTION_LABELS.q15}</th><td>${escapeHtml(r.q15 || '—')}</td></tr>`;
+
+  if (r.q16) {
+    const src = r.q16.startsWith('data:') ? r.q16 : `${API_BASE}${r.q16}`;
+    rows += `<tr><th>Q16 · ${QUESTION_LABELS.q16}</th><td><img class="drawing-preview" src="${src}" alt="drawing" onclick="openImage('${src.replace(/'/g, "\\'")}')"></td></tr>`;
+  } else {
+    rows += `<tr><th>Q16 · ${QUESTION_LABELS.q16}</th><td>—</td></tr>`;
+  }
+
+  if (r.emotionType) rows += `<tr><th>情绪类型</th><td>${escapeHtml(r.emotionType)}</td></tr>`;
+  if (r.behaviorType) rows += `<tr><th>行为类型</th><td>${escapeHtml(r.behaviorType)}</td></tr>`;
+  if (r.submittedAt || r.timestamp) rows += `<tr><th>提交时间</th><td>${escapeHtml(r.submittedAt || r.timestamp)}</td></tr>`;
+
+  detail.innerHTML = `<table>${rows}</table>`;
+  detail.style.display = 'block';
+}
+
+// ─── Utilities ───
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function openImage(src) {
+  const modal = document.getElementById('imageModal');
+  document.getElementById('modalImg').src = src;
+  modal.classList.add('active');
+}
+
+// ─── Auto Refresh ───
+document.getElementById('autoRefresh').addEventListener('change', function() {
+  if (this.checked) {
+    refreshInterval = setInterval(loadData, 30000);
+  } else {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+});
+
+// ─── Init ───
+loadData();
+</script>
+</body>
+</html>
