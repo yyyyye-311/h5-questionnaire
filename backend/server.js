@@ -55,6 +55,27 @@ async function initDatabase() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sensory_responses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      q1 TEXT,
+      q2 TEXT,
+      q3 TEXT,
+      q4 TEXT,
+      q5 TEXT,
+      scent TEXT,
+      weather TEXT,
+      bpm TEXT,
+      generated_poem TEXT,
+      generated_extra TEXT,
+      tempo_word TEXT,
+      music_type TEXT,
+      ip_address TEXT,
+      user_agent TEXT
+    )
+  `);
+
   saveDatabase();
 }
 
@@ -141,6 +162,40 @@ function classifyBehavior(row) {
   }
 
   return '未分类';
+}
+
+// ============================================================
+// Sensory Mapping Analysis Logic
+// ============================================================
+
+function classifySensoryDensity(row) {
+  switch(row.q5) {
+    case 'A': return '幽灵型';
+    case 'B': return '薄雾型';
+    case 'C': return '轮廓型';
+    case 'D': return '浓缩型';
+    default: return '未分类';
+  }
+}
+
+function classifySensoryConnection(row) {
+  switch(row.q2) {
+    case 'A': return '广播型';
+    case 'B': return '窄播型';
+    case 'C': return '锚定型';
+    case 'D': return '内化型';
+    default: return '未分类';
+  }
+}
+
+function classifySensoryMovement(row) {
+  switch(row.q4) {
+    case 'A': return '漂泊';
+    case 'B': return '游走';
+    case 'C': return '前进';
+    case 'D': return '扎根';
+    default: return '未分类';
+  }
 }
 
 // ============================================================
@@ -344,6 +399,222 @@ app.get('/api/export', (req, res) => {
     res.send('\ufeff' + csv);
   } catch (err) {
     console.error('Export error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+// Sensory Mapping API Endpoints
+// ============================================================
+
+// POST /api/sensory/submit — submit a sensory mapping response
+app.post('/api/sensory/submit', (req, res) => {
+  try {
+    const data = req.body;
+
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ua = req.headers['user-agent'] || '';
+
+    db.run(`
+      INSERT INTO sensory_responses (
+        q1, q2, q3, q4, q5, scent, weather, bpm,
+        generated_poem, generated_extra, tempo_word, music_type,
+        ip_address, user_agent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      data.q1 || null,
+      data.q2 || null,
+      data.q3 || null,
+      data.q4 || null,
+      data.q5 || null,
+      data.scent || null,
+      data.weather || null,
+      data.bpm || null,
+      data.generated_poem || null,
+      data.generated_extra || null,
+      data.tempo_word || null,
+      data.music_type || null,
+      ip,
+      ua
+    ]);
+
+    const lastId = db.exec("SELECT last_insert_rowid() as id")[0].values[0][0];
+    saveDatabase();
+
+    res.json({ success: true, id: lastId });
+  } catch (err) {
+    console.error('Sensory submit error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/sensory/responses — all sensory responses
+app.get('/api/sensory/responses', (req, res) => {
+  try {
+    const rows = queryAll('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    console.error('Fetch sensory responses error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/sensory/stats — sensory mapping statistics
+app.get('/api/sensory/stats', (req, res) => {
+  try {
+    const rows = queryAll('SELECT * FROM sensory_responses');
+    const totalCount = rows.length;
+
+    // Option counts for q1-q5
+    const questionStats = {};
+    for (let i = 1; i <= 5; i++) {
+      const key = `q${i}`;
+      const counts = { A: 0, B: 0, C: 0, D: 0 };
+      rows.forEach(row => {
+        const val = row[key];
+        if (val && counts.hasOwnProperty(val)) {
+          counts[val]++;
+        }
+      });
+      const percentages = {};
+      for (const opt of ['A', 'B', 'C', 'D']) {
+        percentages[opt] = totalCount > 0
+          ? Math.round((counts[opt] / totalCount) * 10000) / 100
+          : 0;
+      }
+      questionStats[key] = { counts, percentages };
+    }
+
+    // Density analysis
+    const densityCounts = {
+      '幽灵型': 0,
+      '薄雾型': 0,
+      '轮廓型': 0,
+      '浓缩型': 0,
+      '未分类': 0
+    };
+    rows.forEach(row => {
+      const type = classifySensoryDensity(row);
+      densityCounts[type]++;
+    });
+
+    // Connection analysis
+    const connectionCounts = {
+      '广播型': 0,
+      '窄播型': 0,
+      '锚定型': 0,
+      '内化型': 0,
+      '未分类': 0
+    };
+    rows.forEach(row => {
+      const type = classifySensoryConnection(row);
+      connectionCounts[type]++;
+    });
+
+    // Movement analysis
+    const movementCounts = {
+      '漂泊': 0,
+      '游走': 0,
+      '前进': 0,
+      '扎根': 0,
+      '未分类': 0
+    };
+    rows.forEach(row => {
+      const type = classifySensoryMovement(row);
+      movementCounts[type]++;
+    });
+
+    // Music distribution
+    const musicCounts = { slow: 0, mid: 0, fast: 0 };
+    rows.forEach(row => {
+      const val = row.music_type;
+      if (val && musicCounts.hasOwnProperty(val)) {
+        musicCounts[val]++;
+      }
+    });
+
+    // Top scents
+    const scentMap = {};
+    rows.forEach(row => {
+      if (row.scent) {
+        scentMap[row.scent] = (scentMap[row.scent] || 0) + 1;
+      }
+    });
+    const topScents = Object.entries(scentMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([value, count]) => ({ value, count }));
+
+    // Top weathers
+    const weatherMap = {};
+    rows.forEach(row => {
+      if (row.weather) {
+        weatherMap[row.weather] = (weatherMap[row.weather] || 0) + 1;
+      }
+    });
+    const topWeathers = Object.entries(weatherMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([value, count]) => ({ value, count }));
+
+    res.json({
+      success: true,
+      totalResponses: totalCount,
+      questionStats,
+      density_analysis: densityCounts,
+      connection_analysis: connectionCounts,
+      movement_analysis: movementCounts,
+      music_distribution: musicCounts,
+      top_scents: topScents,
+      top_weathers: topWeathers
+    });
+  } catch (err) {
+    console.error('Sensory stats error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/sensory/export — CSV export of sensory responses
+app.get('/api/sensory/export', (req, res) => {
+  try {
+    const rows = queryAll('SELECT * FROM sensory_responses ORDER BY submitted_at DESC');
+
+    const headers = [
+      'id', 'submitted_at',
+      'q1', 'q2', 'q3', 'q4', 'q5',
+      'scent', 'weather', 'bpm',
+      'generated_poem', 'generated_extra', 'tempo_word', 'music_type',
+      'density_type', 'connection_type', 'movement_type',
+      'ip_address', 'user_agent'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    rows.forEach(row => {
+      row.density_type = classifySensoryDensity(row);
+      row.connection_type = classifySensoryConnection(row);
+      row.movement_type = classifySensoryMovement(row);
+
+      const values = headers.map(h => {
+        const val = row[h];
+        if (val === null || val === undefined) return '';
+        // Escape CSV values
+        const str = String(val).replace(/"/g, '""');
+        return str.includes(',') || str.includes('"') || str.includes('\n')
+          ? `"${str}"`
+          : str;
+      });
+      csvRows.push(values.join(','));
+    });
+
+    const csv = csvRows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=sensory_responses.csv');
+    // Add BOM for Excel UTF-8 compatibility
+    res.send('\ufeff' + csv);
+  } catch (err) {
+    console.error('Sensory export error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
