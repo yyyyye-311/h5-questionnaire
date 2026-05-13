@@ -721,7 +721,8 @@ async function loadData() {
       fetch(`${API_BASE}/api/responses`)
     ]);
     statsData = await statsRes.json();
-    responsesData = await responsesRes.json();
+    const respJson = await responsesRes.json();
+    responsesData = respJson.data || respJson;
     render();
   } catch (err) {
     console.error('Failed to load data:', err);
@@ -735,7 +736,8 @@ async function loadSensoryData() {
       fetch(`${API_BASE}/api/sensory/responses`)
     ]);
     sensoryStatsData = await statsRes.json();
-    sensoryResponsesData = await responsesRes.json();
+    const sensRespJson = await responsesRes.json();
+    sensoryResponsesData = sensRespJson.data || sensRespJson;
     renderSensory();
   } catch (err) {
     console.error('Failed to load sensory data:', err);
@@ -763,7 +765,7 @@ function render() {
 
 function renderOverview() {
   const s = statsData;
-  document.getElementById('totalCount').textContent = s.totalSubmissions || 0;
+  document.getElementById('totalCount').textContent = s.totalResponses || 0;
   document.getElementById('completionRate').textContent =
     s.completionRate != null ? (s.completionRate * 100).toFixed(1) + '%' : '—';
   document.getElementById('todayCount').textContent = s.todayCount || 0;
@@ -803,7 +805,7 @@ function renderTimeline() {
 }
 
 function renderQuestions() {
-  const dist = statsData.questionDistribution || {};
+  const dist = statsData.questionStats || {};
 
   for (let i = 1; i <= 13; i++) {
     const key = `q${i}`;
@@ -949,7 +951,7 @@ function renderResponseSelector() {
 
   select.innerHTML = '<option value="">选择一条提交记录...</option>';
   responses.forEach((r, i) => {
-    const label = `#${i + 1} — ${r.submittedAt || r.timestamp || '未知时间'}`;
+    const label = `#${i + 1} — ${r.submitted_at || r.submittedAt || r.timestamp || '未知时间'}`;
     select.innerHTML += `<option value="${i}">${label}</option>`;
   });
 }
@@ -999,11 +1001,11 @@ function renderSensory() {
 
 function renderSensoryOverview() {
   const s = sensoryStatsData;
-  document.getElementById('sensoryTotalCount').textContent = s.totalSubmissions || 0;
+  document.getElementById('sensoryTotalCount').textContent = s.totalResponses || 0;
 }
 
 function renderSensoryQuestions() {
-  const dist = sensoryStatsData.questionDistribution || {};
+  const dist = sensoryStatsData.questionStats || {};
 
   for (let i = 1; i <= 5; i++) {
     const key = `q${i}`;
@@ -1058,7 +1060,7 @@ function renderSensoryQuestions() {
 function renderSensoryPieCharts() {
   // 存在密度
   const densityCtx = document.getElementById('sensoryDensityChart').getContext('2d');
-  const density = sensoryStatsData.densityTypes || {};
+  const density = sensoryStatsData.density_analysis || sensoryStatsData.densityTypes || {};
   const densityLabels = ['幽灵型', '薄雾型', '轮廓型', '浓缩型'];
   const densityData = densityLabels.map(l => density[l] || 0);
 
@@ -1083,7 +1085,7 @@ function renderSensoryPieCharts() {
 
   // 连接方式
   const connectionCtx = document.getElementById('sensoryConnectionChart').getContext('2d');
-  const connection = sensoryStatsData.connectionTypes || {};
+  const connection = sensoryStatsData.connection_analysis || sensoryStatsData.connectionTypes || {};
   const connectionLabels = ['广播型', '窄播型', '锚定型', '内化型'];
   const connectionData = connectionLabels.map(l => connection[l] || 0);
 
@@ -1108,7 +1110,7 @@ function renderSensoryPieCharts() {
 
   // 移动状态
   const movementCtx = document.getElementById('sensoryMovementChart').getContext('2d');
-  const movement = sensoryStatsData.movementTypes || {};
+  const movement = sensoryStatsData.movement_analysis || sensoryStatsData.movementTypes || {};
   const movementLabels = ['漂泊', '游走', '前进', '扎根'];
   const movementData = movementLabels.map(l => movement[l] || 0);
 
@@ -1134,7 +1136,7 @@ function renderSensoryPieCharts() {
 
 function renderSensoryMusic() {
   const ctx = document.getElementById('sensoryMusicChart').getContext('2d');
-  const music = sensoryStatsData.musicDistribution || {};
+  const music = sensoryStatsData.music_distribution || sensoryStatsData.musicDistribution || {};
   const labels = ['slow', 'mid', 'fast'];
   const values = labels.map(l => music[l] || 0);
 
@@ -1167,7 +1169,7 @@ function renderSensoryMusic() {
 function renderSensoryWords() {
   // Scent words
   const scentContainer = document.getElementById('scentWordList');
-  const scentWords = sensoryStatsData.topScentWords || [];
+  const scentWords = sensoryStatsData.top_scents || sensoryStatsData.topScentWords || [];
   if (scentWords.length === 0) {
     scentContainer.innerHTML = '<h3>气味词汇 Top Scent Words</h3><div class="word-item" style="color:var(--muted)">暂无数据</div>';
   } else {
@@ -1179,7 +1181,7 @@ function renderSensoryWords() {
 
   // Weather words
   const weatherContainer = document.getElementById('weatherWordList');
-  const weatherWords = sensoryStatsData.topWeatherWords || [];
+  const weatherWords = sensoryStatsData.top_weathers || sensoryStatsData.topWeatherWords || [];
   if (weatherWords.length === 0) {
     weatherContainer.innerHTML = '<h3>天气词汇 Top Weather Words</h3><div class="word-item" style="color:var(--muted)">暂无数据</div>';
   } else {
@@ -1196,7 +1198,7 @@ function renderSensoryResponseSelector() {
 
   select.innerHTML = '<option value="">选择一条感官测绘记录...</option>';
   responses.forEach((r, i) => {
-    const label = `#${i + 1} — ${r.submittedAt || r.timestamp || '未知时间'}`;
+    const label = `#${i + 1} — ${r.submitted_at || r.submittedAt || r.timestamp || '未知时间'}`;
     select.innerHTML += `<option value="${i}">${label}</option>`;
   });
 }
