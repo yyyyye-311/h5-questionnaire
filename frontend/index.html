@@ -1173,6 +1173,107 @@ function generateResults() {
     </div>
   `;
 
+  // Card 5: 迷茫图形 (expanded)
+  const confusionExpanded = {
+    A: { shape: '缠绕的线', detail: '你心里有方向，只是太多方向同时拉扯。解法不是选一个方向，是放掉几根线。' },
+    B: { shape: '分散的箭头', detail: '外界在给你矛盾的信号，你需要屏蔽一些噪音。试着只听一个声音。' },
+    C: { shape: '循环的圆', detail: '你感到自己在重复中打转，但每一次循环都会积累微小的位移。螺旋也是前进。' },
+    D: { shape: '空白', detail: '意义暂未浮现，但空白也是重新书写的起点。空不是没有，是还没决定放什么。' }
+  };
+  const confExp = confusionExpanded[q10] || confusionExpanded['D'];
+  html += `
+    <div class="result-card">
+      <div class="card-label">🌀 迷茫图形 CONFUSION SHAPE</div>
+      <h2>${confExp.shape}</h2>
+      <p>${confExp.detail}</p>
+    </div>
+  `;
+
+  // Card 6: 连接密度
+  const connScore = ({A:0,B:1,C:2,D:3}[q7]||0) + ({A:0,B:1,C:2,D:3}[q8]||0) + ({A:1,B:2,C:3,D:0}[q9]||0);
+  let connTitle, connDesc;
+  if (connScore <= 2) { connTitle = '低密度连接'; connDesc = '你像一颗远离星系的恒星，独自燃烧。这不是孤独，是你选择的引力范围。'; }
+  else if (connScore <= 5) { connTitle = '中度连接'; connDesc = '你维持着几根细线连接这个世界——不多不少，刚好够用。你知道什么时候需要回应，什么时候需要安静。'; }
+  else if (connScore <= 7) { connTitle = '高密度连接'; connDesc = '你的存在网络密集而活跃。人际关系是你的氧气，你通过他人的目光确认自己的轮廓。'; }
+  else { connTitle = '超级连接体'; connDesc = '你是一个人际枢纽，所有人都能在你这里找到一个接口。你的痕迹遍布他人的生活。'; }
+  html += `
+    <div class="result-card">
+      <div class="card-label">🕸️ 连接密度 CONNECTION</div>
+      <h2>${connTitle}</h2>
+      <p>${connDesc}</p>
+    </div>
+  `;
+
+  // Card 7: 痕迹保质期
+  const permScore = ({A:1,B:2,C:3,D:0}[q5]||0) + ({A:0,B:3,C:1,D:2}[q6]||0) + ({A:0,B:1,C:2,D:3}[q13]||0);
+  let permTitle, permDesc;
+  if (permScore <= 2) { permTitle = '瞬时型'; permDesc = '你的痕迹像沙滩上的脚印——潮水来时就消失。这不是悲伤，是你存在的方式本身就是流动的。'; }
+  else if (permScore <= 4) { permTitle = '短期型'; permDesc = '你的痕迹有些会留下，有些会消失。你在有意无意间筛选着什么值得被记住。'; }
+  else if (permScore <= 6) { permTitle = '中期型'; permDesc = '你留下的东西有一定的重量。不是刻意保存，而是你做事的方式自然会产生沉淀。'; }
+  else { permTitle = '持久型'; permDesc = '你留下的东西像刻在石头上的字——需要很长时间才会模糊。你的存在是沉重的、确实的。'; }
+  html += `
+    <div class="result-card">
+      <div class="card-label">⏳ 痕迹保质期 SHELF LIFE</div>
+      <h2>${permTitle}</h2>
+      <p>${permDesc}</p>
+    </div>
+  `;
+
+  // Card 8: 城市关系
+  const q3 = answers[3];
+  const cityRelation = {
+    A: { A:'你在最拥挤的地方感到最轻盈。城市是背景板，你是路过的人。', B:'你熟悉这座城市的小巷和深夜营业的店，但没有一个地方让你觉得「到家了」。', C:'你在城市里找到了你的赛道。速度和你匹配。', D:'你在这座高密度的城市里开辟了一小块只属于你的领地。' },
+    B: { A:'你在熟悉的地方感到陌生。也许是你变了，也许是这里太久没变。', B:'你在认识你的人中间移动，但没有人真正知道你在想什么。', C:'你在一个节奏较慢的地方维持着自己的速度。这需要意志力。', D:'你和这个地方彼此熟悉，像一对安静的老朋友。' },
+    C: { A:'小地方的熟悉感有时是一种困住，你的心早已不在这里。', B:'小地方的熟悉感有时是一种困住，你的心早已不在这里。', C:'你在一个被很多人忽略的地方，认真地活着。这本身就是一种姿态。', D:'你在一个被很多人忽略的地方，认真地活着。这本身就是一种姿态。' },
+    D: { A:'你没有固定的坐标，城市对你来说是一系列临时的容器。自由的代价是没有抽屉放东西。', B:'你没有固定的坐标，城市对你来说是一系列临时的容器。自由的代价是没有抽屉放东西。', C:'你没有固定的坐标，但你知道自己要去哪里。路本身就是家。', D:'你没有固定的坐标，但你已经学会在任何地方扎下临时的根。' }
+  };
+  const cityRow = cityRelation[q3] || cityRelation['D'];
+  const cityText = cityRow[q12] || cityRow['A'];
+  html += `
+    <div class="result-card">
+      <div class="card-label">🏙️ 城市关系 CITY BOND</div>
+      <p>${cityText}</p>
+    </div>
+  `;
+
+  // Card 9: 数字自我 vs 物理自我
+  const digiScore = ({A:2,B:0,C:-1,D:2}[q4]||0) + ({A:0,B:0,C:-2,D:2}[q5]||0) + ({A:2,B:-2,C:0,D:-1}[q6]||0);
+  let digiTitle, digiDesc;
+  if (digiScore >= 3) { digiTitle = '数字主导'; digiDesc = '你的影子比你的身体更真实——截图、备忘录、数据……如果服务器消失，你的大半个自己也会蒸发。'; }
+  else if (digiScore >= 0) { digiTitle = '双栖平衡'; digiDesc = '你在两个世界之间来回穿梭——手机里有你，桌上也有你。你是双栖的。'; }
+  else { digiTitle = '物理主导'; digiDesc = '你是少数还在用物理方式证明自己存在的人。你信任触摸得到的东西。'; }
+  html += `
+    <div class="result-card">
+      <div class="card-label">🪞 存在介质 MEDIUM</div>
+      <h2>${digiTitle}</h2>
+      <p>${digiDesc}</p>
+    </div>
+  `;
+
+  // Card 10: 今日路径 (open-ended display)
+  let pathHtml = '';
+  if (objectName || objectAdj) {
+    pathHtml += `<p><span class="highlight">代表物品：</span>${objectName}${objectAdj ? '（' + objectAdj + '）' : ''}</p>`;
+  }
+  if (q15) {
+    pathHtml += `<p><span class="highlight">真实存在的瞬间：</span>「${q15}」</p>`;
+  }
+  const canvas = document.getElementById('drawCanvas');
+  const drawingData = canvas ? canvas.toDataURL('image/png') : '';
+  const hasDrawing = drawingData && drawingData !== 'data:,';
+  if (hasDrawing) {
+    pathHtml += `<div style="margin-top:0.8rem;text-align:center;"><img src="${drawingData}" style="max-width:100%;border-radius:8px;border:1px solid #eee;" alt="你的路径图"></div>`;
+  }
+  if (!pathHtml) {
+    pathHtml = '<p style="color:#999;font-style:italic;">你选择了留白——这也是一种痕迹。</p>';
+  }
+  html += `
+    <div class="result-card">
+      <div class="card-label">📍 今日路径 YOUR PATH</div>
+      ${pathHtml}
+    </div>
+  `;
+
   return html;
 }
 
