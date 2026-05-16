@@ -167,7 +167,23 @@ function classifySensoryMovement(row) {
 // POST /api/submit — submit a questionnaire response
 app.post('/api/submit', async (req, res) => {
   try {
-    const data = req.body;
+    const raw = req.body;
+
+    // Frontend sends { answers: { q1:'A', ..., q14: {object,adjective}, q15:'text' }, canvas: 'data:...' }
+    // Unwrap the answers object; also support flat format for backward compat
+    const answers = raw.answers || raw;
+    const canvasData = raw.canvas || raw.q16_drawing || null;
+
+    // Extract q14 (dual-input: {object, adjective})
+    const q14raw = answers.q14 || {};
+    const q14_object = (typeof q14raw === 'object' ? q14raw.object : null) || answers.q14_object || null;
+    const q14_adjective = (typeof q14raw === 'object' ? q14raw.adjective : null) || answers.q14_adjective || null;
+
+    // Extract q15 (textarea)
+    const q15_moment = (typeof answers.q15 === 'string' ? answers.q15 : null) || answers.q15_moment || null;
+
+    // Extract q16 (canvas drawing)
+    const q16_drawing = canvasData || answers.q16_drawing || null;
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ua = req.headers['user-agent'] || '';
@@ -180,23 +196,23 @@ app.post('/api/submit', async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
       RETURNING id
     `, [
-      data.q1 || null,
-      data.q2 || null,
-      data.q3 || null,
-      data.q4 || null,
-      data.q5 || null,
-      data.q6 || null,
-      data.q7 || null,
-      data.q8 || null,
-      data.q9 || null,
-      data.q10 || null,
-      data.q11 || null,
-      data.q12 || null,
-      data.q13 || null,
-      data.q14_object || null,
-      data.q14_adjective || null,
-      data.q15_moment || null,
-      data.q16_drawing || null,
+      answers.q1 || null,
+      answers.q2 || null,
+      answers.q3 || null,
+      answers.q4 || null,
+      answers.q5 || null,
+      answers.q6 || null,
+      answers.q7 || null,
+      answers.q8 || null,
+      answers.q9 || null,
+      answers.q10 || null,
+      answers.q11 || null,
+      answers.q12 || null,
+      answers.q13 || null,
+      q14_object,
+      q14_adjective,
+      q15_moment,
+      q16_drawing,
       ip,
       ua
     ]);
@@ -304,9 +320,35 @@ app.get('/api/stats', async (req, res) => {
         : 0;
     }
 
+    // Completion rate: responses that have at least q1 through q13 filled
+    const completedCount = rows.filter(r => r.q1 && r.q4 && r.q9 && r.q13).length;
+    const completionRate = totalCount > 0 ? completedCount / totalCount : 0;
+
+    // Today's submissions
+    const today = new Date().toISOString().split('T')[0];
+    const todayCount = rows.filter(r => {
+      if (!r.submitted_at) return false;
+      return new Date(r.submitted_at).toISOString().split('T')[0] === today;
+    }).length;
+
+    // Timeline: submissions grouped by day (last 30 days)
+    const dayMap = {};
+    rows.forEach(r => {
+      if (!r.submitted_at) return;
+      const day = new Date(r.submitted_at).toISOString().split('T')[0];
+      dayMap[day] = (dayMap[day] || 0) + 1;
+    });
+    const timeline = Object.entries(dayMap)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+
     res.json({
       success: true,
       totalResponses: totalCount,
+      completionRate,
+      todayCount,
+      timeline,
       questionStats,
       emotionalAnalysis: {
         counts: emotionalCounts,
