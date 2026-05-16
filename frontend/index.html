@@ -388,6 +388,122 @@ textarea.text-input {
   color: var(--gray-dark);
 }
 
+/* Result Screen */
+.result-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--white);
+  z-index: 3000;
+  overflow-y: auto;
+  padding: 40px 24px 60px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s;
+}
+
+.result-screen.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.result-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.result-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.result-header p {
+  font-size: 13px;
+  color: var(--gray-dark);
+}
+
+.result-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.result-card h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.8rem;
+  font-weight: 500;
+}
+
+.result-card p {
+  color: #555;
+  line-height: 1.7;
+  margin-bottom: 0.5rem;
+}
+
+.result-card .icon-large {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.result-card .card-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-dark);
+  margin-bottom: 8px;
+}
+
+.result-card .highlight {
+  color: var(--black);
+  font-weight: 500;
+}
+
+.poem-block {
+  font-size: 1.3rem;
+  text-align: center;
+  padding: 1rem;
+  color: #333;
+  line-height: 2;
+}
+
+.result-card .personal-note {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #eee;
+  font-size: 13px;
+  color: var(--gray-dark);
+  line-height: 1.6;
+}
+
+.btn-restart {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 2rem auto 0;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1.5px solid var(--black);
+  background: var(--white);
+  color: var(--black);
+  transition: all 0.2s;
+}
+
+.btn-restart:active {
+  background: var(--black);
+  color: var(--white);
+}
+
+.result-cards-wrapper {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
 /* Responsive */
 @media (min-width: 600px) {
   .screen {
@@ -432,6 +548,17 @@ textarea.text-input {
   </div>
   <div class="message">提交成功</div>
   <div class="sub-message">Thank you for your response</div>
+</div>
+
+<div class="result-screen" id="resultScreen">
+  <div class="result-cards-wrapper">
+    <div class="result-header">
+      <h1>你的痕迹档案</h1>
+      <p>Your Trace Profile</p>
+    </div>
+    <div id="resultCards"></div>
+    <button class="btn-restart" onclick="restartSurvey()">重新填写</button>
+  </div>
 </div>
 
 <script>
@@ -882,6 +1009,203 @@ function updateNav() {
   }
 }
 
+// Result generation logic
+function generateResults() {
+  const archetypes = {
+    digital_nomad: { title: "数字游牧者", desc: "你的存在大量储存在云端和截图里。你对物理世界保持一种可拆卸的关系——物品堆积但随时能走，邻居是背景辐射，倾诉流向匿名的信号塔。你的痕迹是数字化的、可删除的、低风险的。", icon: "🌫️" },
+    silent_collector: { title: "沉默收藏家", desc: "你通过日常物品和手写痕迹悄悄证明自己活着。房间有生活的温度却不张扬，物件磨损出光泽。你不轻易倾诉，但留下的每一样东西都像一个未说完的句子。", icon: "📦" },
+    wandering_collage: { title: "拼贴游荡者", desc: "你的生活是一幅胶水未干的拼贴画——上一刻是工位表格，下一刻是便利店热包子。你在线下偶尔与人交换信号，但更多时候在城市的夹缝里独自移动，收集碎片而不整理它们。", icon: "🗺️" },
+    rooted_artisan: { title: "扎根手艺人", desc: "你与周围环境有着紧密的经纬。邻里相识，物件手作，倾诉有固定的对象。你的生活质感是稳定的结构，迷茫时你看见的是循环的圆或清晰的路径，你知道自己留下了什么。", icon: "🪴" },
+    mist_floating: { title: "雾中漂浮者", desc: "你当下的状态像雾气本身——边界模糊，方向未定。手机里可能是大量截图或空白，居住空间痕迹微弱，社交近乎静音。你感到自己漂浮着，但这份漂浮本身是一种诚实的停顿。", icon: "🌁" }
+  };
+
+  // Score archetypes
+  const scores = { digital_nomad: 0, silent_collector: 0, wandering_collage: 0, rooted_artisan: 0, mist_floating: 0 };
+
+  const q4 = answers[4], q5 = answers[5], q6 = answers[6], q7 = answers[7];
+  const q8 = answers[8], q9 = answers[9], q10 = answers[10], q11 = answers[11];
+  const q12 = answers[12], q13 = answers[13];
+
+  // Q4
+  if (q4 === 'A') { scores.digital_nomad += 2; scores.mist_floating += 1; }
+  else if (q4 === 'B') { scores.wandering_collage += 2; scores.silent_collector += 1; }
+  else if (q4 === 'C') { scores.rooted_artisan += 1; }
+  else if (q4 === 'D') { scores.silent_collector += 1; }
+
+  // Q6
+  if (q6 === 'A') { scores.digital_nomad += 2; scores.mist_floating += 1; }
+  else if (q6 === 'B') { scores.silent_collector += 2; scores.rooted_artisan += 1; }
+  else if (q6 === 'C') { scores.wandering_collage += 2; }
+  else if (q6 === 'D') { scores.silent_collector += 1; scores.rooted_artisan += 1; }
+
+  // Q5
+  if (q5 === 'A') { scores.digital_nomad += 1; }
+  else if (q5 === 'B') { scores.silent_collector += 1; }
+  else if (q5 === 'C') { scores.rooted_artisan += 2; }
+  else if (q5 === 'D') { scores.mist_floating += 2; }
+
+  // Q7
+  if (q7 === 'A' || q7 === 'B') { scores.digital_nomad += 1; scores.mist_floating += 1; }
+  else if (q7 === 'C' || q7 === 'D') { scores.rooted_artisan += 2; }
+
+  // Q8
+  if (q8 === 'A') { scores.mist_floating += 2; scores.digital_nomad += 1; }
+  else if (q8 === 'B') { scores.wandering_collage += 1; }
+  else if (q8 === 'C' || q8 === 'D') { scores.rooted_artisan += 1; }
+
+  // Q9
+  if (q9 === 'A') { scores.digital_nomad += 2; scores.mist_floating += 1; }
+  else if (q9 === 'B') { scores.wandering_collage += 1; }
+  else if (q9 === 'C') { scores.rooted_artisan += 2; }
+  else if (q9 === 'D') { scores.silent_collector += 2; }
+
+  // Q12
+  if (q12 === 'A') { scores.mist_floating += 3; }
+  else if (q12 === 'B') { scores.wandering_collage += 3; }
+  else if (q12 === 'C') { scores.rooted_artisan += 1; scores.wandering_collage += 1; }
+  else if (q12 === 'D') { scores.rooted_artisan += 3; }
+
+  // Q13
+  if (q13 === 'A') { scores.mist_floating += 2; }
+  else if (q13 === 'B') { scores.digital_nomad += 1; }
+  else if (q13 === 'C') { scores.silent_collector += 1; }
+  else if (q13 === 'D') { scores.rooted_artisan += 2; }
+
+  // Find top archetype
+  let topKey = 'mist_floating';
+  let topScore = 0;
+  for (const key in scores) {
+    if (scores[key] > topScore) { topScore = scores[key]; topKey = key; }
+  }
+  const archetype = archetypes[topKey];
+
+  // Confusion shape (Q10)
+  const confusionMap = {
+    A: "缠绕的线——你心里有方向，只是太多方向同时拉扯。",
+    B: "分散的箭头——外界在给你矛盾的信号，你需要屏蔽一些噪音。",
+    C: "循环的圆——你感到自己在重复中打转，但每一次循环都会积累微小的位移。",
+    D: "空白——意义暂未浮现，但空白也是重新书写的起点。"
+  };
+  const confusionShape = confusionMap[q10] || confusionMap['D'];
+
+  // Life texture (Q11)
+  const textureMap = {
+    A: { name: "雾气质感", desc: "你的生活像晨雾——边界模糊，方向感缺失，但有一种潮湿的温柔。你不确定自己要去哪，但这雾气中藏着很多尚未凝结的可能性。" },
+    B: { name: "拼贴质感", desc: "你的生活由异质碎片拼接而成——工作、兴趣、关系、独处时刻彼此不连贯，但正是这种不连贯构成了你独特的纹理。" },
+    C: { name: "摩擦质感", desc: "你感受到持续的阻力——不是停滞，而是每一步都需要额外的力气。这种摩擦让你疲惫，但也让你清晰地感知到自己在移动。" },
+    D: { name: "稳定结构", desc: "你的生活像一组精密积木——每一块都有它的位置，整体稳固而清晰。你知道自己在哪里，也知道下一步往哪走。" }
+  };
+  const texture = textureMap[q11] || textureMap['A'];
+
+  // Poetic tag (Q4 × Q12)
+  const wordMap = {
+    4: { A: ['截图', '暂停的'], B: ['碎片', '散装的'], C: ['日常', '被凝视的'], D: ['备忘录', '未命名的'] },
+    12: { A: ['漂浮', '随波逐流的'], B: ['游走', '无导航的'], C: ['前进', '知道方向的'], D: ['扎根', '安静扩展的'] }
+  };
+  const subjList = ['一座孤岛', '一个电台', '一间老屋', '一个黑洞', '一片雾', '一幅拼贴画', '一张砂纸', '一组积木', '一张充气床', '一个徒步者', '一个骑行手', '一棵树'];
+
+  const w4 = wordMap[4][q4] || wordMap[4]['A'];
+  const w12 = wordMap[12][q12] || wordMap[12]['A'];
+  const subj = subjList[Math.floor(Math.random() * subjList.length)];
+  const poeticTag = `${w12[1]}${subj}，装满${w4[1]}${w4[0]}，正在${w12[0]}`;
+
+  // Inner weather (Q9 × Q11)
+  const weatherMix = {
+    A: { A: '数字雨', B: '干燥的风', C: '浓雾', D: '暴风雪前的寂静' },
+    B: { A: '晴朗而冷', B: '和煦微风', C: '湿润的雨季', D: '阴天但舒适' },
+    C: { A: '窗上的冰花', B: '晾晒的棉被味阳光', C: '温热的阵雨', D: '炉火旁的干燥' },
+    D: { A: '无声的雪', B: '低沉的雷鸣', C: '持续的细雨', D: '空旷的蓝天' }
+  };
+  const weatherRow = weatherMix[q11] || weatherMix['A'];
+  const weather = weatherRow[q9] || weatherRow['A'];
+
+  // Personal items from Q14 and Q15
+  const q14 = answers[14] || {};
+  const q15 = answers[15] || '';
+  const objectName = q14.object || '';
+  const objectAdj = q14.adjective || '';
+
+  // Build result HTML
+  let html = '';
+
+  // Card 1: Archetype + Confusion Shape
+  html += `
+    <div class="result-card">
+      <div class="card-label">存在原型 ARCHETYPE</div>
+      <div class="icon-large">${archetype.icon}</div>
+      <h2>${archetype.title}</h2>
+      <p>${archetype.desc}</p>
+      <p style="margin-top:0.8rem;"><span class="highlight">迷茫图形：</span>${confusionShape}</p>
+    </div>
+  `;
+
+  // Card 2: Life Texture
+  let textureExtra = '';
+  if (objectName) {
+    textureExtra += `<div class="personal-note">你的代表物件：<span class="highlight">${objectName}</span>${objectAdj ? ' — ' + objectAdj : ''}</div>`;
+  }
+  if (q15) {
+    textureExtra += `<div class="personal-note">你感到真实存在的瞬间：「${q15.length > 60 ? q15.slice(0, 60) + '...' : q15}」</div>`;
+  }
+  html += `
+    <div class="result-card">
+      <div class="card-label">生活质感 LIFE TEXTURE</div>
+      <h2>${texture.name}</h2>
+      <p>${texture.desc}</p>
+      ${textureExtra}
+    </div>
+  `;
+
+  // Card 3: Poetic Tag
+  html += `
+    <div class="result-card">
+      <div class="card-label">诗意标签 POETIC TAG</div>
+      <div class="poem-block">${poeticTag}</div>
+    </div>
+  `;
+
+  // Card 4: Inner Weather
+  html += `
+    <div class="result-card">
+      <div class="card-label">内在天气 INNER WEATHER</div>
+      <h2>${weather}</h2>
+      <p>这是你的倾诉方式与生活质感交汇后形成的内在气候——不是永恒的天气，而是此刻的温度。</p>
+    </div>
+  `;
+
+  return html;
+}
+
+function showResults() {
+  const resultHTML = generateResults();
+  document.getElementById('resultCards').innerHTML = resultHTML;
+  document.getElementById('submitOverlay').classList.remove('visible');
+  document.getElementById('resultScreen').classList.add('visible');
+  document.querySelector('.nav-bar').style.display = 'none';
+}
+
+function restartSurvey() {
+  // Reset state
+  current = 0;
+  for (const key in answers) delete answers[key];
+  canvasHistory = [];
+
+  // Hide result screen
+  document.getElementById('resultScreen').classList.remove('visible');
+  document.querySelector('.nav-bar').style.display = '';
+
+  // Re-render
+  renderApp();
+
+  // Reset all screen positions
+  document.querySelectorAll('.screen').forEach((s, i) => {
+    s.classList.remove('active', 'exit-left');
+    if (i === 0) s.classList.add('active');
+  });
+
+  updateNav();
+}
+
 // Submit
 async function submitForm() {
   // Get canvas data
@@ -917,8 +1241,11 @@ async function submitForm() {
     console.log('Submit endpoint not available, payload logged:', payload);
   }
 
-  // Show success
+  // Show success briefly, then show results
   document.getElementById('submitOverlay').classList.add('visible');
+  setTimeout(() => {
+    showResults();
+  }, 1500);
 }
 
 // Init
