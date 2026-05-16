@@ -76,54 +76,92 @@ async function initDatabase() {
 
 function classifyEmotion(row) {
   const { q9, q10, q11, q12 } = row;
+  if (!q9 && !q10 && !q11 && !q12) return '未分类';
 
-  // 漂泊型 (Drifting): q12=A + (q11=A or q10=D)
-  if (q12 === 'A' && (q11 === 'A' || q10 === 'D')) {
-    return '漂泊型';
+  // Scoring approach: each answer contributes points to types
+  const scores = { '漂泊型': 0, '挣扎型': 0, '沉稳型': 0, '探索型': 0 };
+
+  // Q12 状态感 (strongest signal)
+  if (q12 === 'A') { scores['漂泊型'] += 3; scores['挣扎型'] += 1; }
+  else if (q12 === 'B') { scores['探索型'] += 3; scores['漂泊型'] += 1; }
+  else if (q12 === 'C') { scores['探索型'] += 2; scores['沉稳型'] += 1; }
+  else if (q12 === 'D') { scores['沉稳型'] += 3; }
+
+  // Q11 生活质感
+  if (q11 === 'A') { scores['漂泊型'] += 2; scores['挣扎型'] += 1; }
+  else if (q11 === 'B') { scores['探索型'] += 2; scores['漂泊型'] += 1; }
+  else if (q11 === 'C') { scores['挣扎型'] += 3; }
+  else if (q11 === 'D') { scores['沉稳型'] += 2; }
+
+  // Q10 迷茫形状
+  if (q10 === 'A') { scores['挣扎型'] += 2; scores['探索型'] += 1; }
+  else if (q10 === 'B') { scores['探索型'] += 2; scores['挣扎型'] += 1; }
+  else if (q10 === 'C') { scores['挣扎型'] += 1; scores['沉稳型'] += 1; }
+  else if (q10 === 'D') { scores['漂泊型'] += 2; scores['挣扎型'] += 1; }
+
+  // Q9 倾诉方式
+  if (q9 === 'A') { scores['漂泊型'] += 1; }
+  else if (q9 === 'B') { scores['探索型'] += 1; }
+  else if (q9 === 'C') { scores['沉稳型'] += 2; }
+  else if (q9 === 'D') { scores['挣扎型'] += 1; scores['沉稳型'] += 1; }
+
+  // Find highest score
+  let top = '未分类', topScore = 0;
+  for (const [type, score] of Object.entries(scores)) {
+    if (score > topScore) { topScore = score; top = type; }
   }
-
-  // 挣扎型 (Struggling): q11=C + (q10=A or q9=D)
-  if (q11 === 'C' && (q10 === 'A' || q9 === 'D')) {
-    return '挣扎型';
-  }
-
-  // 沉稳型 (Stable): q12=D + (q11=D or q10=C)
-  if (q12 === 'D' && (q11 === 'D' || q10 === 'C')) {
-    return '沉稳型';
-  }
-
-  // 探索型 (Exploring): q12=B or q12=C + (q10=B or q11=B)
-  if ((q12 === 'B' || q12 === 'C') && (q10 === 'B' || q11 === 'B')) {
-    return '探索型';
-  }
-
-  return '未分类';
+  return topScore >= 2 ? top : '未分类';
 }
 
 function classifyBehavior(row) {
   const { q4, q5, q6, q7, q8, q9 } = row;
+  if (!q4 && !q5 && !q6 && !q7 && !q8) return '未分类';
 
-  // 数字游牧 (Digital Nomad): q4=A + (q5=D or q8=A)
-  if (q4 === 'A' && (q5 === 'D' || q8 === 'A')) {
-    return '数字游牧';
+  // Scoring approach
+  const scores = { '数字游牧': 0, '社交活跃': 0, '内向沉淀': 0, '生活主义': 0 };
+
+  // Q4 手机内容
+  if (q4 === 'A') { scores['数字游牧'] += 3; }
+  else if (q4 === 'B') { scores['生活主义'] += 2; scores['数字游牧'] += 1; }
+  else if (q4 === 'C') { scores['生活主义'] += 2; scores['内向沉淀'] += 1; }
+  else if (q4 === 'D') { scores['数字游牧'] += 2; scores['内向沉淀'] += 1; }
+
+  // Q5 居住空间
+  if (q5 === 'A') { scores['数字游牧'] += 1; scores['内向沉淀'] += 1; }
+  else if (q5 === 'B') { scores['内向沉淀'] += 2; }
+  else if (q5 === 'C') { scores['生活主义'] += 3; }
+  else if (q5 === 'D') { scores['数字游牧'] += 2; }
+
+  // Q6 代表物件
+  if (q6 === 'A') { scores['数字游牧'] += 2; }
+  else if (q6 === 'B') { scores['内向沉淀'] += 2; scores['生活主义'] += 1; }
+  else if (q6 === 'C') { scores['数字游牧'] += 1; scores['内向沉淀'] += 1; }
+  else if (q6 === 'D') { scores['生活主义'] += 2; }
+
+  // Q7 邻居关系
+  if (q7 === 'A') { scores['数字游牧'] += 1; }
+  else if (q7 === 'B') { scores['内向沉淀'] += 1; }
+  else if (q7 === 'C') { scores['社交活跃'] += 2; scores['生活主义'] += 1; }
+  else if (q7 === 'D') { scores['社交活跃'] += 3; }
+
+  // Q8 社交频率
+  if (q8 === 'A') { scores['内向沉淀'] += 2; scores['数字游牧'] += 1; }
+  else if (q8 === 'B') { scores['内向沉淀'] += 1; }
+  else if (q8 === 'C') { scores['社交活跃'] += 2; }
+  else if (q8 === 'D') { scores['社交活跃'] += 3; scores['生活主义'] += 1; }
+
+  // Q9 倾诉方式 (secondary)
+  if (q9 === 'A') { scores['数字游牧'] += 1; }
+  else if (q9 === 'B') { scores['社交活跃'] += 1; }
+  else if (q9 === 'C') { scores['社交活跃'] += 1; scores['生活主义'] += 1; }
+  else if (q9 === 'D') { scores['内向沉淀'] += 2; }
+
+  // Find highest score
+  let top = '未分类', topScore = 0;
+  for (const [type, score] of Object.entries(scores)) {
+    if (score > topScore) { topScore = score; top = type; }
   }
-
-  // 社交活跃 (Socially Active): q8=C or q8=D + (q7=C or q7=D)
-  if ((q8 === 'C' || q8 === 'D') && (q7 === 'C' || q7 === 'D')) {
-    return '社交活跃';
-  }
-
-  // 内向沉淀 (Introverted): q8=A + q9=D + (q5=A or q5=B)
-  if (q8 === 'A' && q9 === 'D' && (q5 === 'A' || q5 === 'B')) {
-    return '内向沉淀';
-  }
-
-  // 生活主义 (Life-oriented): q5=C + (q4=B or q6=D)
-  if (q5 === 'C' && (q4 === 'B' || q6 === 'D')) {
-    return '生活主义';
-  }
-
-  return '未分类';
+  return topScore >= 2 ? top : '未分类';
 }
 
 // ============================================================
