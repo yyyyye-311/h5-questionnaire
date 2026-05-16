@@ -811,7 +811,7 @@ function renderQuestions() {
     const key = `q${i}`;
     const canvasId = `chartQ${i}`;
     const ctx = document.getElementById(canvasId).getContext('2d');
-    const qData = dist[key] || {};
+    const qData = (dist[key] && dist[key].counts) || dist[key] || {};
 
     const labels = Object.keys(qData);
     const values = Object.values(qData);
@@ -857,7 +857,7 @@ function renderQuestions() {
 
 function renderEmotionChart() {
   const ctx = document.getElementById('emotionChart').getContext('2d');
-  const emotion = statsData.emotionTypes || {};
+  const emotion = (statsData.emotionalAnalysis && statsData.emotionalAnalysis.counts) || statsData.emotionTypes || {};
   const labels = ['漂泊型', '挣扎型', '沉稳型', '探索型', '未分类'];
   const data = labels.map(l => emotion[l] || 0);
 
@@ -886,7 +886,7 @@ function renderEmotionChart() {
 
 function renderBehaviorChart() {
   const ctx = document.getElementById('behaviorChart').getContext('2d');
-  const behavior = statsData.behaviorTypes || {};
+  const behavior = (statsData.behavioralAnalysis && statsData.behavioralAnalysis.counts) || statsData.behaviorTypes || {};
   const labels = ['数字游牧', '社交活跃', '内向沉淀', '生活主义', '未分类'];
   const data = labels.map(l => behavior[l] || 0);
 
@@ -919,28 +919,32 @@ function renderOpenEnded() {
   // Q14
   const q14Container = document.getElementById('q14List');
   const q14Items = responses
-    .filter(r => r.q14)
-    .map((r, i) => `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(r.q14)}</div>`)
+    .filter(r => r.q14_object || r.q14_adjective || r.q14)
+    .map((r, i) => {
+      const text = r.q14 || [r.q14_object, r.q14_adjective].filter(Boolean).join('，');
+      return `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(text)}</div>`;
+    })
     .join('');
   q14Container.innerHTML = `<h3>Q14 · 物品 + 形容词</h3>${q14Items || '<div class="item" style="color:var(--muted)">暂无数据</div>'}`;
 
   // Q15
   const q15Container = document.getElementById('q15List');
   const q15Items = responses
-    .filter(r => r.q15)
-    .map((r, i) => `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(r.q15)}</div>`)
+    .filter(r => r.q15_moment || r.q15)
+    .map((r, i) => `<div class="item"><span class="idx">#${i + 1}</span>${escapeHtml(r.q15_moment || r.q15)}</div>`)
     .join('');
   q15Container.innerHTML = `<h3>Q15 · 某个瞬间 Moment</h3>${q15Items || '<div class="item" style="color:var(--muted)">暂无数据</div>'}`;
 
   // Q16 drawings
   const gallery = document.getElementById('drawingGallery');
-  const drawings = responses.filter(r => r.q16);
+  const drawings = responses.filter(r => r.q16_drawing || r.q16);
   if (drawings.length === 0) {
     gallery.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:20px;">暂无绘图数据</div>';
     return;
   }
   gallery.innerHTML = drawings.map((r, i) => {
-    const src = r.q16.startsWith('data:') ? r.q16 : `${API_BASE}${r.q16}`;
+    const raw = r.q16_drawing || r.q16;
+    const src = raw.startsWith('data:') ? raw : `${API_BASE}${raw}`;
     return `<div class="gallery-item" onclick="openImage('${src.replace(/'/g, "\\'")}')"><img src="${src}" alt="drawing ${i + 1}" loading="lazy"></div>`;
   }).join('');
 }
@@ -971,11 +975,13 @@ function showResponse(index) {
     const key = `q${i}`;
     rows += `<tr><th>Q${i} · ${QUESTION_LABELS[key]}</th><td>${escapeHtml(r[key] || '—')}</td></tr>`;
   }
-  rows += `<tr><th>Q14 · ${QUESTION_LABELS.q14}</th><td>${escapeHtml(r.q14 || '—')}</td></tr>`;
-  rows += `<tr><th>Q15 · ${QUESTION_LABELS.q15}</th><td>${escapeHtml(r.q15 || '—')}</td></tr>`;
+  const q14Val = r.q14 || [r.q14_object, r.q14_adjective].filter(Boolean).join('，') || '—';
+  rows += `<tr><th>Q14 · ${QUESTION_LABELS.q14}</th><td>${escapeHtml(q14Val)}</td></tr>`;
+  rows += `<tr><th>Q15 · ${QUESTION_LABELS.q15}</th><td>${escapeHtml(r.q15_moment || r.q15 || '—')}</td></tr>`;
 
-  if (r.q16) {
-    const src = r.q16.startsWith('data:') ? r.q16 : `${API_BASE}${r.q16}`;
+  const q16Raw = r.q16_drawing || r.q16;
+  if (q16Raw) {
+    const src = q16Raw.startsWith('data:') ? q16Raw : `${API_BASE}${q16Raw}`;
     rows += `<tr><th>Q16 · ${QUESTION_LABELS.q16}</th><td><img class="drawing-preview" src="${src}" alt="drawing" onclick="openImage('${src.replace(/'/g, "\\'")}')"></td></tr>`;
   } else {
     rows += `<tr><th>Q16 · ${QUESTION_LABELS.q16}</th><td>—</td></tr>`;
